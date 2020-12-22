@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/local/autopkg/python
 #
 # Copyright 2017 Graham Pugh
 #
@@ -16,9 +16,9 @@
 
 from __future__ import absolute_import, print_function
 
-import requests
+import json
 
-from autopkglib import Processor, ProcessorError  # pylint: disable=import-error
+from autopkglib import Processor, ProcessorError, URLGetter  # pylint: disable=import-error
 
 # Set the webhook_url to the one provided by Slack when you create the webhook at https://my.slack.com/services/new/incoming-webhook/
 
@@ -97,12 +97,32 @@ class Slacker(Processor):
 
             slack_data = {"text": slack_text}
 
-            response = requests.post(webhook_url, json=slack_data)
-            if response.status_code != 200:
-                raise ValueError(
-                    f"Request to slack returned an error {response.status_code}, "
-                    "the response is:\n{response.text}"
-                )
+            json_data = json.dumps(slack_data)
+
+        # Build the headers
+        headers = {
+          "Content-Type": "application/json"
+        }
+        print ("Headers are:", headers)
+
+        # Build the required curl switches
+        curl_opts = [
+            "--data", json_data,
+            "{}".format(self.env.get("webhook_url"))
+        ]
+
+        print ("Curl options are:", curl_opts)
+
+        # Initialize the curl_cmd, add the curl options, and execute the curl
+        try:
+            curl_cmd = self.prepare_curl_cmd()
+            self.add_curl_headers(curl_cmd, headers)
+            curl_cmd.extend(curl_opts)
+            print ("Curl command is:", curl_cmd)
+            response = self.download_with_curl(curl_cmd)
+
+        except:
+            raise ProcessorError("Failed to complete the post")
 
 
 if __name__ == "__main__":
